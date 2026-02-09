@@ -1,0 +1,59 @@
+---
+name: tftest action
+description: Runs tftest and outputs any failures
+author: me@tomasbasham.dev
+branding:
+  color: purple
+  icon: git-pull-request
+inputs:
+  additional-args:
+    description: |
+      Space separated args specified here will be added during tftest execution.
+      (eg. --verbose)
+  format:
+    description: The format of the output
+    default: json
+  terraform-version:
+    description: |
+      The version of terraform to use. If not specified, then the latest version
+      of terraform will be used.
+    default: latest
+  version:
+    description: The version of tftest to use, defaults to latest
+    default: latest
+  working-directory:
+    description: |
+      Directory to run the action on, from the repo root. Default is . (root of
+      the repository)
+    default: .
+outputs:
+  tftest-return-code:
+    description: tftest command return code
+    value: ${{ steps.tftest.outputs.tftest-return-code }}
+runs:
+  # Ideally we would use the `docker` runner to run the container directly, but
+  # this doesn't allow us to use template variables in the `image` field, so we
+  # have to run the container manually in a bash step instead.
+  # using: docker
+  # image: docker://ghcr.io/kapetndev/tftest:${{ inputs.version }}
+  # args:
+  # - ${{ inputs.format && format('--format={0}', inputs.format) || '' }}
+  # - ${{ inputs.terraform-version && format('--terraform-version={0}', inputs.terraform-version) || '' }}
+  # - ${{ inputs.additional-args }}
+  # - ${{ inputs.working-directory }}
+  using: composite
+  steps:
+  - name: Run tftest
+    id: tftest
+    shell: bash
+    run: |
+      docker run --rm \
+        --user "$(id -u):$(id -g)" \
+        -v "${{ github.workspace }}:/workspace" \
+        -w "/workspace" \
+        ghcr.io/kapetndev/tftest:${{ inputs.version }} \
+        ${{ inputs.format && format('--format={0}', inputs.format) || '' }} \
+        ${{ inputs.terraform-version && format('--terraform-version={0}', inputs.terraform-version) || '' }} \
+        ${{ inputs.additional-args }} \
+        ${{ inputs.working-directory }}
+      echo "tftest-return-code=$?" >> "$GITHUB_OUTPUT"
